@@ -285,12 +285,7 @@ _time_series_cache_binary = None  # {time: np.ndarray of routed sediment (t/day 
 
 
 def _characteristic_length_per_cell():
-    """Return per-cell overland distance to channel (m).
-    Priority order:
-      (1) EXTERNAL_OVERLAND_LENGTHS, if provided and valid length N.
-      (2) olf_data[any_t]['overland_length'], if present.
-      (3) sqrt(cell_area) as a proxy.
-    """
+    """Return per-cell overland distance to the channel in meters."""
     import numpy as _np
     N = triangle_count()
     try:
@@ -404,9 +399,7 @@ def nutrient_enrichment_ratio(ssc_mgL):
 def cal_Q_s(time, station_mask_cells, chan_mask_cell):
     return calc_station_discharge_m3s(time, station_mask_cells, chan_mask_cell)
 def cal_Qflow_cell_m3_day(time):
-    """
-    Per-cell discharge from OLF flow rate, unit m3/day.
-    """
+    """Return per-cell OLF discharge in m3/day."""
     Q_cell_m3_s = np.asarray(cal_Qflow_cell_m3_s(time), dtype=float)
     Q_cell_m3_s = np.where(np.isfinite(Q_cell_m3_s), Q_cell_m3_s, 0.0)
     Q_cell_m3_s = np.maximum(Q_cell_m3_s, 0.0)
@@ -415,21 +408,7 @@ def cal_Qflow_cell_m3_day(time):
 
 
 def build_daily_schedule(solution_times, dt=86400.0):
-    """
-     HGS  solution_times 
-    [(day_time, hydro_time), ...]
-      - day_time: 
-      - hydro_time:  HGS  parameters_calcal_SDR 
-
-    
-       times = [0, 86400, 864000]
-      1: 0 -> 86400   (1 )
-        -> 1  t=0  day_time=0, hydro_time=0
-      2: 86400 -> 864000  (9 )
-        -> 9  t=86400 
-           day_time=86400, 950400, ... , 86400+8*86400
-     HGS  t_last (t_last, t_last)
-    """
+    """Build the daily routing schedule from HGS solution times."""
     times = sorted(solution_times)
     schedule = []
 
@@ -565,16 +544,7 @@ def build_station_event_qpeak_table(df_station,
 
     return pd.DataFrame(rows)
 def simulate_time_series_binary():
-    """
-    Day-by-day routing with per-cell carry-over (binary rule + advancing distance):
-      - Daily production = MUSLE (no SDR here).
-      - Each day a cell advances D = v * 86400 (m) along hillslope length L.
-      - If today's new MUSLE can fully reach channel within D (D >= L), it enters channel today;
-        otherwise queued with remaining_distance = L - D and will continue advancing in future days.
-      - Pending masses reduce remaining_distance by D each day; when <=0, they enter that day's channel.
-    Channel routing on each day uses existing sediment_transport_variableSDR(time, src), which applies SDR.
-    Returns: {time: np.ndarray(N)} routed output for each solution time.
-    """
+    """Run distance-based daily sediment routing with per-cell carry-over."""
     import numpy as _np
 
     global _time_series_cache_binary
@@ -643,18 +613,7 @@ def simulate_time_series_binary():
 
 
 def simulate_daily_loop():
-    """
-    Run sediment routing sequentially over all HGS solution_times.
-
-    production_t = newly generated sediment at current timestep
-    carry        = retained sediment from previous timestep
-    src          = production_t + carry
-
-    retained, delivered = sediment_transport_variableSDR(t, src)
-
-    delivered is saved as the exported sediment for this timestep.
-    retained is carried forward to the next timestep.
-    """
+    """Run sediment routing sequentially with retained sediment carried forward."""
 
     delivered_series = {}
     retained_series = {}
@@ -839,21 +798,7 @@ def read_chan_channel_zones(chan_path):
 
     raise RuntimeError("Failed to read Zone block from CHAN file.")
 def read_chan_element_centroids(chan_path):
-    """
-    Read CHAN Tecplot BLOCK file and return channel element centroids.
-
-    CHAN file has its own NODES and ELEMENTS, e.g. NODES=22117, ELEMENTS=22116.
-    This function reads:
-      - node x
-      - node y
-      - element node connectivity
-    and computes centroid for each CHAN element.
-
-    Returns
-    -------
-    chan_centroids : np.ndarray, shape (n_chan_elements, 2)
-        x, y centroids of CHAN elements.
-    """
+    """Read CHAN geometry and return element centroids."""
 
     def _next_nonempty_line(f):
         while True:
@@ -882,10 +827,7 @@ def read_chan_element_centroids(chan_path):
         return np.asarray(vals[:n], dtype=float)
 
     def _read_connectivity(f, ne):
-        """
-        Tecplot FE connectivity usually appears after all variable blocks.
-        For FELINESEG, each element has 2 node ids.
-        """
+        """Read Tecplot FE line connectivity."""
         conn = []
         while len(conn) < ne:
             line = _next_nonempty_line(f)
@@ -975,22 +917,7 @@ def read_chan_element_centroids(chan_path):
 
     return centroids
 def build_chan_mask_by_centroid_mapping(chan_path, max_dist_m=50.0):
-    """
-    Map CHAN element centroids back to OLF surface mesh cells using nearest centroid.
-
-    Parameters
-    ----------
-    chan_path : str
-        Path to .chan.dat file.
-    max_dist_m : float
-        Maximum allowed distance between CHAN centroid and OLF surface cell centroid.
-        If too small, some CHAN elements may not map.
-        Try 50, 100, or 200 m depending on mesh resolution.
-
-    Returns
-    -------
-    chan_mask : np.ndarray, bool, length = number of OLF surface elements
-    """
+    """Map CHAN element centroids to nearest OLF surface cells."""
 
     from scipy.spatial import cKDTree
 
@@ -1053,12 +980,7 @@ def find_mesh_time():
     raise KeyError("cant find x/y/element node lists--MESH_KEYS")
 
 def get_required(t_sec, key_or_list, *, allow_mesh_fallback=False):
-    """
-    Return olf_data[t_sec][key] where key_or_list can be:
-      - str: exact key
-      - list[str]: try keys in order, return first hit
-    If allow_mesh_fallback=True and not found at t_sec, try MESH_TIME.
-    """
+    """Return a required OLF field by exact key or candidate-key list."""
     # ---- pick the dict for this time ----
     data = olf_data.get(t_sec, None)
     if data is None:
@@ -1093,12 +1015,7 @@ def get_required(t_sec, key_or_list, *, allow_mesh_fallback=False):
     )
 
 def get_flow_rate_node(time):
-    """
-    Try to load 'flow rate' field.
-    If not found, automatically compute it from velocities:
-        flow_rate = sqrt(vx^2 + vy^2 + vz^2)
-    vz is optional; if missing, use only vx, vy.
-    """
+    """Return OLF flow rate, falling back to velocity magnitude if needed."""
     # Try real flow rate from OLF
     try:
         return get_required(time, FIELD_KEYS["flow_rate_node"])
@@ -1225,9 +1142,7 @@ def flow_mag(cell_idx, time):
     return float(np.hypot(vx[cell_idx], vy[cell_idx]))
 
 def flow_dir_deg(cell_idx, time):
-    """
-atan2(vy, vx)( +x = 0, +y = 90)
-    """
+    """Return flow direction in degrees."""
     vx = get_required(time, "x linear velocity (cell centred)")
     vy = get_required(time, "y linear velocity (cell centred)")
     ang = math.degrees(math.atan2(vy[cell_idx], vx[cell_idx]))
@@ -1275,15 +1190,7 @@ def cal_EF(t):
 
 
 def cal_Qproxy_m3_day(time, areas_m2):
-    """
-    Build a discharge proxy per cell (m3/day) using OLF cell-centred velocities and depth.
-
-    Q_proxy(m3/s) ~ |v|(m/s) * depth(m) * L(m)
-    where L = sqrt(area_m2) is a cell length scale.
-
-    Returns:
-        Q_proxy_m3_day: numpy array, shape (N,), m3/day per cell. 
-    """
+    """Build a per-cell discharge proxy from velocity, depth, and cell area."""
     vx = np.asarray(get_required(time, "x linear velocity (cell centred)"), dtype=float)
     vy = np.asarray(get_required(time, "y linear velocity (cell centred)"), dtype=float)
     vmag = np.hypot(vx, vy)  # m/s
@@ -1304,26 +1211,7 @@ def get_node_count():
     return len(x_nodes)
 
 def get_node_field_or_zeros(t_sec, field_key_name_or_list, *, allow_mesh_fallback=True):
-    """
-    Safe getter for node-based (or cell-based) arrays from OLF, returning zeros if missing.
-
-    Supports:
-      1) field_key_name_or_list is a string key, e.g. "Precipitation"
-         -> will look up FIELD_KEYS["Precipitation"] (candidate list) if exists,
-            otherwise treat the string as a direct key to search in olf_data[t].
-      2) field_key_name_or_list is a list/tuple of candidate keys, e.g. FIELD_KEYS["Precipitation"]
-         -> will pass that list directly to get_required (which supports list).
-
-    Params:
-      - t_sec: time in seconds
-      - field_key_name_or_list: str or list/tuple
-      - allow_mesh_fallback: pass-through to get_required fallback behavior
-
-    Returns:
-      - np.ndarray of floats (length = triangle/node count, depending on OLF variables)
-        If the variable cannot be found at t_sec (or mesh fallback), returns zeros array
-        with the same length as a reference field at that time (best effort).
-    """
+    """Return an OLF field as an array, or a zero array if the field is missing."""
     import numpy as np
 
     if isinstance(field_key_name_or_list, (list, tuple)):
@@ -1397,13 +1285,7 @@ def cal_Precipitation(time):
     return Rain_cell
 
 def build_dynamic_channel_mask_for_time(time):
-    """
-    Return the sediment-transport mask for one timestep:
-      fixed CHAN cells + wet neighbor cells around CHAN based on current depth.
-
-    This keeps true channel geometry stable while allowing near-channel wet cells
-    to participate only when they are wet at the current timestep.
-    """
+    """Return the timestep-specific channel mask for sediment routing."""
     if CHAN_MASK is None:
         if CHANNEL_MASK is not None:
             return np.asarray(CHANNEL_MASK, dtype=bool).copy()
@@ -1446,11 +1328,7 @@ def calculate_CFRG(rock):
     return max(0.0, 1.0 - rock)
 
 def compute_cell_slope_and_LS(time):
-    """
-    Returns:
-      slope_sin: list of sin(theta) per cell
-      LS_list:   list of LS factor per cell (dimensionless)
-    """
+    """Compute per-cell slope and LS factor from mesh elevations."""
     z_nodes = get_required(MESH_TIME, MESH_KEYS["node_z"], allow_mesh_fallback=False)  # meters
     x_nodes = get_required(MESH_TIME, MESH_KEYS["node_x"], allow_mesh_fallback=False)
     y_nodes = get_required(MESH_TIME, MESH_KEYS["node_y"], allow_mesh_fallback=False)
@@ -1536,12 +1414,7 @@ def calculate_sediment_yield(Q_surf, q_peak, area_hru, K_USLE, C_USLE, P_USLE, L
     return out
 
 def apply_event_saturation(ssc_event_mgL):
-    """
-    Smooth transport-capacity/supply-limitation transform for event SSC.
-
-    Values much lower than EVENT_SATURATION_CAP_MGL are weakly affected; high
-    event concentrations are compressed smoothly instead of being hard-clipped.
-    """
+    """Apply a smooth saturation cap to event SSC."""
     x = max(float(ssc_event_mgL), 0.0)
     if (not USE_EVENT_SATURATION) or x <= 0.0:
         return x
@@ -1552,14 +1425,7 @@ def apply_event_saturation(ssc_event_mgL):
     return cap * ratio_g / (1.0 + ratio_g)
 
 def calculate_qpeak_manning(depth_cell, area_hru_m2, slope_sin, n_manning, factor=1.0):
-    """
-    Non-rainfall q_peak estimate from Manning open-channel flow:
-      Q = (1/n) * A_flow * R^(2/3) * S^(1/2)
-
-    Cell geometry is approximated as a shallow rectangular section:
-      width ~= sqrt(cell area), A_flow = width * depth,
-      wetted perimeter = width + 2 * depth, R = A_flow / wetted perimeter.
-    """
+    """Estimate q_peak from Manning flow with simplified cell geometry."""
     depth = np.asarray(depth_cell, dtype=float)
     area_m2 = np.asarray(area_hru_m2, dtype=float)
     slope = np.asarray(slope_sin, dtype=float)
@@ -1652,12 +1518,7 @@ def specified_flux_node_to_cell(time, *, to_day=True, cm_unit=False):
     return I_cell
 
 def cal_SDR(time):
-    """
-    Hybrid delivery coefficient:
-      - CHAN channel cells: SDR = 1
-      - active non-channel cells: rainfall/runoff + flow-driven SDR
-      - inactive cells: SDR = 0
-    """
+    """Calculate the hybrid sediment delivery ratio for each cell."""
 
     global CHAN_MASK, CHANNEL_MASK
 
@@ -1744,12 +1605,7 @@ def compute_T(time):
     return T_rows
 
 def compute_T_channel(time, channel_idx):
-    """
-    Build downstream routing weights only among channel cells.
-
-    T_ch[i] = {j: weight_ij}
-    means sediment in channel cell i is routed to downstream channel cell j.
-    """
+    """Build downstream routing weights among channel cells."""
 
     T_all = compute_T(time)
 
@@ -1899,23 +1755,7 @@ def flow_in_river_with_inflow(
     channel_export_frac=None,
     return_mass_balance=False
 ):
-    """
-    Channel sediment routing with downstream transfer.
-
-    Units:
-      sed_flowin_river: t/day per cell
-      initial_sed:      t per cell
-      returned sed_ch_river: t per cell, stored sediment after routing
-      conc_sed_i_array: t/m3
-      conc_sed_max_river: t/m3
-
-    Logic:
-      1. Use CHAN_MASK / CHANNEL_MASK to identify channel cells.
-      2. For each channel cell, mix previous storage + local sediment inflow.
-      3. Apply deposition/degradation based on transport capacity.
-      4. Export a fraction of remaining suspended sediment to downstream channel cells.
-      5. Store the remaining fraction locally for the next timestep.
-    """
+    """Route channel sediment with local storage and downstream transfer."""
 
     N = triangle_count()
 
@@ -2106,10 +1946,7 @@ def flow_in_river_with_inflow(
     return sed_next, conc_for_station, conc_sed_max_river
 def export_river_conc_clamped(time, initial_sed=None, csv_path="river_conc_clamped.csv",
                               sed_flowin_river=None):
-    """
-    Export clamped river concentration for a given time.
-    sed_flowin_river: optional (t/day). If None, use zeros.
-    """
+    """Export clamped river concentration for one timestep."""
     N = triangle_count()
 
     if sed_flowin_river is None:
@@ -2158,10 +1995,7 @@ def export_river_conc_clamped(time, initial_sed=None, csv_path="river_conc_clamp
     log(f"[RIVER] clamped concentration exported to: {csv_path}")
 
 def get_mesh_boundary_segments(x1, y1, x2, y2, x3, y3, ndigits=6):
-    """
-    Extract outer boundary edges from triangular mesh.
-    Boundary edges are edges shared by only one triangle.
-    """
+    """Extract outer boundary edges from a triangular mesh."""
 
     from collections import defaultdict
 
@@ -2221,30 +2055,6 @@ def plot_shapes(time,out_dir,sediment_values_final):
     sed_plot = np.asarray(sediment_values_final, dtype=float)
     sed_plot = np.where(np.isfinite(sed_plot), sed_plot, 0.0)
 
-    # mask zero or near-zero values so they do not dominate the color scale
-    """
-    positive = sed_plot[sed_plot > 0]
-
-    if positive.size > 0:
-        vmin = np.nanpercentile(positive, 5)
-        vmax = np.nanpercentile(positive, 99)
-
-        vmin = max(vmin, 1e-12)
-        vmax = max(vmax, vmin * 10)
-
-        norm = colors.LogNorm(vmin=vmin, vmax=vmax)
-
-        sed_plot_masked = np.ma.masked_less_equal(sed_plot, 0.0)
-
-    else:
-        vmin = 1e-12
-        vmax = 1.0
-        norm = colors.LogNorm(vmin=vmin, vmax=vmax)
-        sed_plot_masked = np.ma.masked_less_equal(sed_plot, 0.0)
-
-    cmap = plt.get_cmap("magma_r").copy()
-    cmap.set_bad(color="white")
-"""
     sed_plot = np.asarray(sed_plot, dtype=float)
     sed_plot = np.where(np.isfinite(sed_plot), sed_plot, 0.0)
 
@@ -2343,62 +2153,40 @@ def plot_zones(time):
     print('finish')
 
 def build_initial_sed_from_conc(time0, conc0_mgL):
-    """
-    time0:  HGS  solution_time
-    conc0_mgL: 
-        - 
-        -  N /
-     sed0_t t N
-    """
-    # 
+    """Build initial river sediment storage from background concentration."""
     areas_ha = np.array(compute_triangle_areas(), dtype=float)
     areas_ha = np.where(areas_ha <= 0, 1.0, areas_ha)
     areas_m2 = areas_ha * 10000.0
 
-    # 
     depth0 = np.array(cal_depth(time0), dtype=float)   # m
 
-    # 
     V0_m3 = areas_m2 * depth0                          # m^3
 
-    #  conc0_mgL  
     conc0_arr = np.array(conc0_mgL, dtype=float)
     if conc0_arr.size == 1:
         conc0_arr = np.full_like(V0_m3, conc0_arr.item())
     elif conc0_arr.size != V0_m3.size:
         raise ValueError("conc0_mgL length does not match the number of cells N")
 
-    #  mg/L   t
     sed0_t = conc0_arr * V0_m3 * 1e-6   # t
 
-    # zone==1 0
     zone = np.array(zoneN(time0), dtype=float)
     sed0_t = np.where(zone > 0, sed0_t, 0.0)
 
     return sed0_t
 def export_daily_Q_timeseries(selected_elems, out_csv_path):
-    """
-     Q_total (t/day) CSV
-
-    selected_elems : list[int]
-        elem_id0 
-         [1000, 2000, 3000]
-    out_csv_path : str
-         CSV 
-    """
+    """Export daily routed sediment time series for selected elements."""
     import numpy as _np
 
     if not solution_times:
         log("[EXPORT] solution_times ")
         return
 
-    #  hydro_time
     schedule = build_daily_schedule(solution_times, dt=DT_SEC)
 
     rows = []
 
     for day_idx, (day_time, hydro_time) in enumerate(schedule):
-        #  hydro_time  MUSLE + SDR
         Q_surf, qch, q_peak, sed_by_ts, sed_all = parameters_cal(hydro_time)
         Q0 = _np.array(sed_all, dtype=float)
 
@@ -2406,7 +2194,6 @@ def export_daily_Q_timeseries(selected_elems, out_csv_path):
         Q_total = _np.asarray(Q_total, dtype=float)  # t/day per cell
 
         for elem_id in selected_elems:
-            # 
             if elem_id < 0 or elem_id >= Q_total.size:
                 continue
 
@@ -2431,14 +2218,7 @@ def export_daily_Q_timeseries(selected_elems, out_csv_path):
 
 
 def cal_Qproxy_from_vh(time, areas_m2):
-    """
-    Build a discharge proxy per cell using:
-      Q_proxy ~ |v| * depth * sqrt(area)
-    where |v| is cell-centred linear velocity magnitude (m/s),
-          depth is water depth (m),
-          sqrt(area) is a length scale (m).
-    Returns: Q_proxy_m3_day per cell (m3/day).
-    """
+    """Build a discharge proxy from velocity, depth, and cell area."""
     vx = np.asarray(get_required(time, FIELD_KEYS["vx_cell"]), dtype=float)
     vy = np.asarray(get_required(time, FIELD_KEYS["vy_cell"]), dtype=float)
     vmag = np.hypot(vx, vy)  # m/s
@@ -2450,9 +2230,7 @@ def cal_Qproxy_from_vh(time, areas_m2):
     Q_proxy_m3s = np.maximum(Q_proxy_m3s, 0.0)
     return Q_proxy_m3s * DT_SEC                       # m3/day
 def save_sediment_map(time, sediment_t_per_ha, out_png_path, title_prefix="Sediment map"):
-    """
-    sediment_t_per_ha: 1D array, length = Ntri, units t/ha/day
-    """
+    """Save a sediment map from per-cell t/ha/day values."""
     x1 = global_coords['x1']; y1 = global_coords['y1']
     x2 = global_coords['x2']; y2 = global_coords['y2']
     x3 = global_coords['x3']; y3 = global_coords['y3']
@@ -2661,15 +2439,7 @@ def write_pest_txt_from_station_df(df_station, out_dir):
 
     return pest_txt
 def plot_mesh_and_channel_mask(channel_mask, out_dir, max_mesh_lines=171609):
-    """
-    Export a figure showing:
-    (a) HGS triangular surface mesh
-    (b) channel / hydraulically connected elements used for sediment routing
-
-    channel_mask: boolean array, length = number of surface elements
-    out_dir: output folder
-    max_mesh_lines: if mesh is too dense, set smaller value for faster plotting
-    """
+    """Export the mesh and active channel-mask diagnostic figure."""
     import os
     import numpy as np
     import matplotlib.pyplot as plt
@@ -2963,15 +2733,7 @@ def main():
 
     # Build masks and station geometry.
     def build_channel_mask():
-        """
-        Build and store three masks:
-
-        DEPTH_MASK   = active-water cells from OLF depth
-        CHAN_MASK    = true channel elements from CHAN file
-        CHANNEL_MASK = fixed base sediment-transport cells from CHAN.
-
-        Dynamic wet neighbors are added per timestep by build_dynamic_channel_mask_for_time().
-        """
+        """Build depth, CHAN, and sediment-routing masks."""
 
         global DEPTH_MASK, CHAN_MASK, CHANNEL_MASK
 
