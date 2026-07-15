@@ -1,0 +1,473 @@
+ptf ~
+# Model run configuration.
+# Edit values on the assignment lines. Comments describe definition, suggested range,
+# default value used here, and units where applicable.
+
+# =============================================================================
+# Input/output files
+# =============================================================================
+
+# Definition: OLF model output file read by the sediment/SSC script.
+# Range/type: existing file path string.
+# Default: "F:/PhD codes/PhD_code/olf/SNW_V4o.olf.dat".
+# Unit: none.
+olf_path = 'Example/SNW_V4o_example_5step_highQ.olf.dat'
+# olf_path = 'Data/your_hgs_output.olf.dat'
+# Definition: CHAN file used to map channel centerlines/elements to mesh cells.
+# Range/type: existing file path string; can be empty only if code is changed to allow fallback.
+# Default: "F:/PhD codes/PhD_code/pest calibration/SNW_V4o.chan.dat".
+# Unit: none.
+chan_path = 'Example/SNW_V4o.chan.dat'
+
+# Definition: output folder for station CSV, event peak CSV, PEST text, and maps.
+# Range/type: folder path string; relative paths are relative to the run directory.
+# Default: "outputs/pest_run".
+# Unit: none.
+out_dir = 'Outputs/PEST_Run'
+
+# Definition: create a timestamped subfolder inside out_dir for each run to prevent overwriting old results.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+timestamp_output_dir = False
+
+# Definition: timestamp folder name format used when timestamp_output_dir is True.
+# Range/type: Python time.strftime format string; avoid ":" because it is invalid in Windows folder names.
+# Default: "run_%Y%m%d_%H%M%S" such as run_20260610_115932.
+# Unit: none.
+output_timestamp_format = "run_%Y%m%d_%H%M%S"
+
+
+# =============================================================================
+# Run switches
+# =============================================================================
+
+# Definition: PEST/calibration mode. True writes compact calibration outputs and suppresses extra plots.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+pest_mode = True
+
+# Definition: Write whole-basin per-cell SSC diagnostics even when pest_mode is True.
+# Range/type: True or False.
+# Default: False for fast calibration runs; set True for spatial exchange/SSC analysis.
+# Unit: none.
+write_cell_ssc_outputs = False
+
+# Definition: enables the day-by-day hillslope carry-over/delivery loop before river routing.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+enable_daily_loop = True
+
+# Definition: when daily loop is enabled, use the latest retained/delivered state for plotting/diagnostics.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+daily_loop_use_last = True
+
+# Definition: enables binary time-routing rule for hillslope sediment arrival.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+use_time_routing_binary = True
+
+# Definition: export sediment maps for each saved timestep when not in PEST mode.
+# Range/type: True or False.
+# Default: False.
+# Unit: none.
+plot_sediment_map_mode = False
+
+# Definition: export groundwater/surface-water exchange flux maps when not in PEST mode.
+# Range/type: True or False.
+# Default: False.
+# Unit: none.
+plot_exchange_flux_map_mode = False
+
+# Definition: enables nutrient transport calculations.
+# Range/type: True or False.
+# Default: False.
+# Unit: none.
+enable_nutrient_module = True
+
+# Definition: use proxy nutrient fields derived from OLF data instead of external nutrient inputs.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+nutrient_use_proxy_from_olf = True
+
+
+# =============================================================================
+# USLE / sediment production parameters
+# =============================================================================
+
+# Definition: peak runoff adjustment factor used by the MUSLE/USLE-style sediment calculation.
+# Range/type: positive float, commonly 0.1-10.
+# Default: 1.0.
+# Unit: dimensionless.
+prf = 0.5
+
+# Definition: coarse scaling coefficient in the sediment production calculation.
+# Range/type: positive float, commonly 0-10 depending on calibration.
+# Default: 1.0.
+# Unit: dimensionless.
+SC = ~      SC      ~
+
+# Definition: channel/hydraulic coefficient used in sediment production or routing terms.
+# Range/type: positive float, commonly 0-10 depending on calibration.
+# Default: 1.0.
+# Unit: dimensionless.
+cch = 1.0
+
+# Definition: USLE support-practice factor.
+# Range/type: 0-1; lower values reduce erosion.
+# Default: 0.5.
+# Unit: dimensionless.
+P_USLE = 0.5
+
+# Definition: USLE slope-length/slope-steepness factor used as a lumped multiplier.
+# Range/type: >= 0, commonly 0-10.
+# Default: 1.14.
+# Unit: dimensionless.
+L_USLE = 1.14
+
+# Definition: rock fragment or surface cover correction factor.
+# Range/type: 0-1 if used as fractional cover; larger only if intentionally calibrated.
+# Default: 0.4.
+# Unit: dimensionless.
+rock = 0.4
+
+# Definition: land-cover/area factor for fallow land contribution.
+# Range/type: >= 0, commonly 0-1 for fractions or 1 for neutral multiplier.
+# Default: 1.0.
+# Unit: dimensionless.
+Afallow = 1.0
+
+# Definition: land-cover/area factor for cropland contribution.
+# Range/type: >= 0, commonly 0-1 for fractions or 1 for neutral multiplier.
+# Default: 1.0.
+# Unit: dimensionless.
+Acrop = 1.0
+
+# Definition: USLE cover-management factor.
+# Range/type: 0-1; lower values indicate stronger vegetation/cover protection.
+# Default: 0.03.
+# Unit: dimensionless.
+C_USLE = ~    C_USLE    ~
+
+# Definition: stream-power or concentration scaling coefficient.
+# Range/type: positive float, commonly 1.0e-6 to 1.0e-2 after calibration.
+# Default: 1.0e-4.
+# Unit: model coefficient.
+c_sp = 1.0e-4
+
+# Definition: exponent applied to stream-power or flow-related sediment term.
+# Range/type: positive float, commonly 1-5.
+# Default: 3.
+# Unit: dimensionless.
+sp_exp = 3
+
+# Definition: channel erodibility or channel sediment coefficient.
+# Range/type: >= 0, commonly 0-1 after calibration.
+# Default: 0.01.
+# Unit: model coefficient.
+K_ch = ~     K_ch     ~
+
+
+# =============================================================================
+# SDR / routing parameters
+# =============================================================================
+
+# Definition: SDR scaling parameter controlling overall sediment delivery ratio magnitude.
+# Range/type: positive float, commonly 0-10 after calibration.
+# Default: 1.0.
+# Unit: dimensionless.
+a = ~    SDR_A     ~
+
+# Definition: SDR curve-shape parameter controlling nonlinearity of delivery.
+# Range/type: positive float, commonly 0.1-5.
+# Default: 0.9.
+# Unit: dimensionless.
+b = ~    SDR_B     ~
+
+# Definition: fraction of undelivered hillslope sediment retained/carrying over between days.
+# Range/type: 0-1; 0 removes retained mass, 1 keeps all retained mass.
+# Default: 0.5.
+# Unit: dimensionless fraction.
+hillslope_carry_decay = 0.5
+
+# Definition: fraction of delivered hillslope sediment exported into the channel routing step.
+# Range/type: 0-1.
+# Default: 0.35.
+# Unit: dimensionless fraction.
+channel_export_frac = 0.35
+
+# Definition: use post-routing river concentration field for station SSC calculation.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+use_post_routing_conc = True
+
+# Definition: fraction of a day assigned to within-day sediment production timing.
+# Range/type: 0-1.
+# Default: 0.0.
+# Unit: day fraction.
+phi_produc_time_frac = 0.0
+
+# Definition: small velocity tolerance used to avoid division by zero or near-zero motion.
+# Range/type: > 0, commonly 1.0e-12 to 1.0e-6.
+# Default: 1.0e-9.
+# Unit: m/s if applied to velocity terms.
+eps_v = 1.0e-9
+
+
+# =============================================================================
+# Flow and SSC parameters
+# =============================================================================
+
+# Definition: initial/background river concentration used to initialize river sediment storage.
+# Range/type: >= 0.
+# Default: 30.0.
+# Unit: mg/L.
+conc0_global = 30.0
+
+# Definition: discharge threshold above which resuspension starts contributing to SSC.
+# Range/type: >= 0.
+# Default: 20000.0 for the current station calibration.
+# Unit: m3/day.
+Qcrit_m3_day = ~    QCRIT     ~
+
+# Definition: minimum station discharge used to avoid unstable concentration division.
+# Range/type: > 0, usually very small.
+# Default: 1.0e-7.
+# Unit: m3/day.
+Qmin_station_m3_day = 1.0e-7
+
+# Definition: coefficient for resuspension SSC component above Qcrit_m3_day.
+# Range/type: >= 0, calibration parameter.
+# Default: 0.005 for the current station calibration.
+# Unit: mg/L per (m3/day)^resus_b.
+resus_k_mgL = ~   RESUS_K    ~
+
+# Definition: exponent for the resuspension response to excess discharge.
+# Range/type: >= 0, commonly 0.5-2.
+# Default: 1.0.
+# Unit: dimensionless.
+resus_b = 1.0
+
+# Definition: constant base SSC component added when use_base_conc is True.
+# Range/type: >= 0.
+# Default: 8.0 for the current observed SSC calibration target.
+# Unit: mg/L.
+C_base_mgL = ~    C_BASE    ~
+
+# Definition: upper cap on the resuspension SSC component.
+# Range/type: >= 0.
+# Default: 25.0 for a mild resuspension cap.
+# Unit: mg/L.
+C_resus_cap_mgL = 25.0
+
+
+# =============================================================================
+# Station location
+# =============================================================================
+
+# Definition: station x-coordinate used to select channel mesh cells within station_r.
+# Range/type: must match mesh coordinate system, usually UTM easting.
+# Default: 491544.165.
+# Unit: m.
+station_xy_x = 482247.665
+
+# Definition: station y-coordinate used to select channel mesh cells within station_r.
+# Range/type: must match mesh coordinate system, usually UTM northing.
+# Default: 5016106.051.
+# Unit: m.
+station_xy_y = 5014782.978
+
+# Definition: search radius around station_xy for selecting station channel cells.
+# Range/type: > 0; smaller radius selects fewer cells, larger radius aggregates more channel cells.
+# Default: 200.0.
+# Unit: m.
+station_r = 200.0
+
+
+# =============================================================================
+# Channel mask settings
+# =============================================================================
+
+# Definition: minimum water depth for treating a mesh cell as active water in depth-based mask.
+# Range/type: >= 0; common values 1.0e-6 to 1.0e-3.
+# Default: 0.000001.
+# Unit: m.
+depth_mask_threshold = 0.000001
+
+# Definition: maximum distance used when mapping CHAN geometry to mesh centroids.
+# Range/type: > 0; should be comparable to mesh resolution/channel spacing.
+# Default: 500.0.
+# Unit: m.
+chan_map_dist_m = 500.0
+
+# Definition: allow dynamic channel mask expansion using neighboring wet cells over time.
+# Range/type: True or False.
+# Default: True; allows station cells to change with wet neighbors.
+# Unit: none.
+use_dynamic_channel_mask = True
+
+# Definition: depth threshold used when adding dynamic neighboring channel cells.
+# Range/type: >= 0.
+# Default: 0.001.
+# Unit: m.
+channel_neighbor_depth_threshold = 0.001
+
+# Definition: number of neighbor rings to search around fixed channel cells.
+# Range/type: integer >= 0.
+# Default: 1.
+# Unit: mesh-neighbor rings.
+channel_neighbor_rings = 1
+
+# Definition: depth field source used for dynamic neighbor selection.
+# Range/type: string, commonly "current" or another code-supported option.
+# Default: "current".
+# Unit: none.
+channel_neighbor_depth_source = "current"
+
+
+# =============================================================================
+# Q-peak settings
+# =============================================================================
+
+# Definition: method used to estimate q/Q peak diagnostics.
+# Range/type: string supported by code, currently "manning" is expected.
+# Default: "manning".
+# Unit: none.
+qpeak_method = "manning"
+
+# Definition: Manning roughness coefficient used by qpeak_method = "manning".
+# Range/type: > 0; natural channels commonly 0.02-0.10.
+# Default: 0.05.
+# Unit: s/m^(1/3).
+manning_n = 0.05
+
+# Definition: multiplier applied to Manning qpeak estimate.
+# Range/type: >= 0, calibration multiplier.
+# Default: 1.0.
+# Unit: dimensionless.
+qpeak_manning_factor = 1.0
+
+
+# =============================================================================
+# SSC component switches
+# =============================================================================
+
+# Definition: include C_base_mgL as a constant base concentration component.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+use_base_conc = True
+
+# Definition: include discharge-driven resuspension component.
+# Range/type: True or False.
+# Default: True for the current station calibration; uses a mild cap to avoid sharp jumps.
+# Unit: none.
+use_resuspension = True
+
+# Definition: include MUSLE/event sediment concentration component.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+use_musle_event = True
+
+# Definition: weighting factor applied to the event/MUSLE SSC component.
+# Range/type: >= 0; commonly 0-1, larger if intentionally amplified.
+# Default: 0.08 for the current observed SSC calibration target.
+# Unit: dimensionless multiplier.
+musle_ssc_weight = ~   MUSLE_W    ~
+
+# Definition: cap/saturate event concentration before applying musle_ssc_weight.
+# Range/type: True or False.
+# Default: True.
+# Unit: none.
+use_event_saturation = True
+
+# Definition: concentration cap used by event saturation.
+# Range/type: >= 0.
+# Default: 120.0 for the current observed SSC calibration target.
+# Unit: mg/L.
+event_saturation_cap_mgL = 120.0
+
+# Definition: saturation curve exponent; larger values make the cap sharper.
+# Range/type: > 0, commonly 0.5-5.
+# Default: 2.0 for the current observed SSC calibration target.
+# Unit: dimensionless.
+event_saturation_gamma = 2.0
+
+
+# =============================================================================
+# Nutrient parameters
+# =============================================================================
+
+# Definition: nitrogen content associated with eroded sediment mass.
+# Range/type: >= 0.
+# Default: 1.0.
+# Unit: kg N per metric ton sediment.
+soil_n_conc_kg_per_ton = 1.0
+
+# Definition: phosphorus content associated with eroded sediment mass.
+# Range/type: >= 0.
+# Default: 0.2.
+# Unit: kg P per metric ton sediment.
+soil_p_conc_kg_per_ton = 0.2
+
+# Definition: enrichment ratio coefficient/intercept.
+# Range/type: >= 0.
+# Default: 1.0.
+# Unit: dimensionless.
+er_a = 1.0
+
+# Definition: enrichment ratio exponent/slope.
+# Range/type: >= 0.
+# Default: 0.2.
+# Unit: dimensionless.
+er_b = 0.2
+
+# Definition: minimum allowed enrichment ratio.
+# Range/type: >= 0 and <= er_max.
+# Default: 0.1.
+# Unit: dimensionless.
+er_min = 0.1
+
+# Definition: maximum allowed enrichment ratio.
+# Range/type: >= er_min.
+# Default: 5.0.
+# Unit: dimensionless.
+er_max = 5.0
+
+# Definition: small sediment-mass tolerance used in nutrient calculations.
+# Range/type: > 0.
+# Default: 1.0e-12.
+# Unit: t/day.
+sed_eps_t_day = 1.0e-12
+
+# Definition: conversion factor for nitrogen exchange concentration to kg/m3.
+# Range/type: > 0.
+# Default: 1.0.
+# Unit: kg/m3 per source unit.
+n_exchange_to_kg_per_m3 = 1.0
+
+# Definition: conversion factor for specified phosphorus concentration to kg/m3.
+# Range/type: > 0.
+# Default: 1.0.
+# Unit: kg/m3 per source unit.
+p_specified_to_kg_per_m3 = 1.0
+
+# Definition: convergence tolerance used by nutrient/iterative solver logic.
+# Range/type: > 0, commonly 1.0e-6 to 1.0e-2.
+# Default: 1.0e-3.
+# Unit: model tolerance.
+converce_difference = 5.0e-3
+
+# Definition: maximum iterations used by the sediment routing fixed-point solver.
+# Range/type: integer >= 1.
+# Default: 500.
+# Unit: iteration count.
+routing_max_iter = 500

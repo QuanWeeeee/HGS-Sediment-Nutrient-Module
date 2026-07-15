@@ -1,0 +1,35 @@
+pcf
+* control data
+restart estimation
+9 5 1 0 1
+1 1 single point
+10.0 -3.0 0.3 0.03 10
+10.0 10.0 0.001
+0.1
+30 0.01 4 4 0.01 4
+1 1 1
+* parameter groups
+sed relative 0.01 0.0 switch 2.0 parabolic
+* parameter data
+SC       log factor 2.0      0.1      10.0     sed 1.0 0.0 1
+C_USLE   log factor 0.03     0.001    0.5      sed 1.0 0.0 1
+K_ch     log factor 0.01     0.0001   1.0      sed 1.0 0.0 1
+SDR_A    log factor 1.0      0.01     10.0     sed 1.0 0.0 1
+SDR_B    none factor 0.9     0.1      5.0      sed 1.0 0.0 1
+C_BASE   none factor 8.0     0.0      50.0     sed 1.0 0.0 1
+RESUS_K  log factor 0.005    0.00001  1.0      sed 1.0 0.0 1
+QCRIT    log factor 10000.0  1.0      1000000.0 sed 1.0 0.0 1
+MUSLE_W  none factor 0.08    0.0      2.0      sed 1.0 0.0 1
+* observation groups
+ssc
+* observation data
+ssc_000 8.0 1.0 ssc
+ssc_001 9.84 1.0 ssc
+ssc_002 20.208 1.0 ssc
+ssc_003 29.28 1.0 ssc
+ssc_004 33.0 1.0 ssc
+* model command line
+"PEST Template\Run_Model_For_PEST.bat"
+* model input/output
+"PEST Template\Model_Config.tpl" Model_Config.txt
+"PEST Template\Extract_PEST_Values.ins" Outputs\PEST_Run\pest_values.txt

@@ -1,0 +1,13 @@
+Run_Log.txt
+*.log
+Outputs/*
+!Outputs/README.txt
+*.exe
+*.zip
+build/
+dist/
+__pycache__/
+*.pyc
+Example/*.olf.dat
+Example/*.chan.dat
+

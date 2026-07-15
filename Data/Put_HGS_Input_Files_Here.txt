@@ -1,0 +1,8 @@
+Optional data folder.
+
+Put user-provided HGS files here if you want to keep inputs beside the program:
+- *.olf.dat
+- *.chan.dat
+
+Large HGS output files are not included in this package.
+Use the GUI Browse buttons to select the actual files before running.
