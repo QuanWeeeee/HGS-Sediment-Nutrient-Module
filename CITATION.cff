@@ -3,8 +3,8 @@ message: "If you use this software, please cite it using the metadata from this 
 title: "HGS Sediment-Nutrient Module"
 type: software
 authors:
-  - family-names: "QuanWeeeee"
+  - given-names: "Quan"
+    family-names: "Wei"
 version: "1.0.0"
 date-released: "2026-07-15"
 repository-code: "https://github.com/QuanWeeeee/HGS-Sediment-Nutrient-Module"
-
