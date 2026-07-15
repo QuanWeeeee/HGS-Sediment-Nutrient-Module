@@ -8,7 +8,7 @@ from matplotlib.collections import PolyCollection, LineCollection
 import matplotlib.colors as colors
 from matplotlib import cm
 import pandas as pd
-# ======== freeze watchdog & unbuffered stdout ========
+# Runtime logging and stdout configuration
 import os, sys, time, threading, logging, faulthandler, signal
 import runpy
 
@@ -145,7 +145,6 @@ def _heartbeat():
 
 threading.Thread(target=_heartbeat, daemon=True).start()
 log("Booting script...")
-# ======== end watchdog ========
 prf = 1.0 
 SC = 1 
 cch = 1.0 
@@ -188,7 +187,7 @@ MUSLE_SSC_WEIGHT = 0.25
 USE_EVENT_SATURATION = True
 EVENT_SATURATION_CAP_MGL = 500
 EVENT_SATURATION_GAMMA = 1.5
-# ==== Mass-balance cumulative trackers ====
+# Mass-balance cumulative trackers
 MASSBAL_IN_CUM = 0.0
 MASSBAL_OUT_CUM = 0.0
 MASSBAL_STORAGE_LAST = 0.0  # last computed in-domain storage
@@ -196,7 +195,7 @@ depth_threshold = 1e-6
 chan_map_dist = 100.0
 DT_SEC = 86400.0  # 1 day in seconds
 DT_DAY = 1.0
-#   Nutrient Transport Related Parameters (start)
+# Nutrient transport defaults
 SOIL_N_CONC_KG_PER_TON = 1.0   
 SOIL_P_CONC_KG_PER_TON = 0.2
 ER_A = 1.0
@@ -208,12 +207,11 @@ N_EXCHANGE_TO_KG_PER_M3 = 1.0
 P_SPECIFIED_TO_KG_PER_M3 = 1.0  
 converce_difference = 5.0e-3
 ROUTING_MAX_ITER = 500
-#    Nutrient Transport Related Parameters (end)
 MESH_TIME = None
 CHANNEL_MASK = None   # combined mask = DEPTH_MASK OR CHAN_MASK
 CHAN_MASK = None      # true CHAN channel elements
 DEPTH_MASK = None     # active-water cells from depth
-#mesh_keys will only read aty the beginnin g of the code
+# Mesh fields are read from the mesh timestep.
 MESH_KEYS = {
     "node_x": ["x", "node x", "X"],
     "node_y": ["y", "node y", "Y"],
@@ -221,7 +219,7 @@ MESH_KEYS = {
     "elem_nodes": ["element node lists", "element nodes", "tri node list"],
     "zone": ["zone (cell centred)","zone"]
 }
-#field_keys will read every timestep
+# Field variables are read at each solution timestep.
 FIELD_KEYS = {
     "flow_rate_node": [
         "flow rate", "Flow rate", "flowrate",
@@ -265,17 +263,17 @@ global_coords = {}       # {'x1','y1','x2','y2','x3','y3'} for mesh
 global_triangles = []    # list of triangles coords (for plotting)
 global_neighbors = {}
 
-# ==== Global switches (placed early to avoid NameError) ====
-ENABLE_DAILY_LOOP = True        # daily loop off by default
+# Runtime switches
+ENABLE_DAILY_LOOP = True
 DAILY_LOOP_USE_LAST = True       # plot last simulated day when daily loop is enabled
-USE_TIME_ROUTING_BINARY = True   # enable binary/queue routing (distance-based) by default   
-PHI_PRODUC_TIME_FRAC = 0.0       # keep 0.0 for strict /
+USE_TIME_ROUTING_BINARY = True
+PHI_PRODUC_TIME_FRAC = 0.0
 EPS_V = 1e-9
 plot_sediment_map_mode = False
-plot_exchange_flux_map_mode = False    # enable mapping exchnage flux map mode
+plot_exchange_flux_map_mode = False
 pest_mode = False
 WRITE_CELL_SSC_OUTPUTS = False
-# User-supplied overland distance to channel (m) per cell; if None, fallback logic applies
+# Optional user-supplied overland distance to channel (m) per cell.
 EXTERNAL_OVERLAND_LENGTHS = None
 ENABLE_NUTRIENT_MODULE = False
 NUTRIENT_USE_PROXY_FROM_OLF = False
@@ -403,20 +401,6 @@ def nutrient_enrichment_ratio(ssc_mgL):
     sediment_kg_m3 = max(float(ssc_mgL), 0.0) / 1000.0
     er = ER_A * max(sediment_kg_m3, SED_EPS_T_DAY) ** (-ER_B)
     return float(np.clip(er, ER_MIN, ER_MAX))
-"""
-def cal_Qflow_cell_m3_day(time):
-
-    #Discharge proxy based on OLF 'flow rate' (node field), averaged to cells.
-    #Returns: Qflow_cell_m3_day (m3/day) per cell.
-
-    # 'flow rate' exists in your OLF (log shows it)
-    Q_node = np.asarray(get_required(time, FIELD_KEYS["flow_rate_node"]), dtype=float)  # node-based
-    Q_cell = np.asarray(average_node_field_to_cells(Q_node.tolist()), dtype=float)     # to cell
-
-    # assume m3/s -> m3/day (typical). keep non-negative
-    Q_cell = np.maximum(Q_cell, 0.0)
-    return Q_cell * DT_SEC
-"""
 def cal_Q_s(time, station_mask_cells, chan_mask_cell):
     return calc_station_discharge_m3s(time, station_mask_cells, chan_mask_cell)
 def cal_Qflow_cell_m3_day(time):
@@ -724,7 +708,7 @@ def simulate_daily_loop():
 
 def open_file():
     return filedialog.askopenfilename(filetypes=[('dat files', '*.dat'), ('All files', '*.*')])
-# READ OLF FILES 
+# OLF and CHAN file readers
 def read_olf_variables(file_path):
     data_by_time = {}
     current_time = None
@@ -775,7 +759,7 @@ def read_chan_channel_zones(chan_path):
             return line
 
     def _skip_n_floats(f, n):
-        #  n  token
+        # Skip n numeric tokens in Tecplot BLOCK format.
         k = 0
         while k < n:
             line = _next_nonempty_line(f)
@@ -798,7 +782,7 @@ def read_chan_channel_zones(chan_path):
         return vals
 
     with open(chan_path, "r", encoding="utf-8", errors="replace") as f:
-        # 1)  VARIABLES 
+        # Locate VARIABLES.
         varnames = None
         while True:
             line = f.readline()
@@ -810,7 +794,7 @@ def read_chan_channel_zones(chan_path):
         if not varnames:
             raise ValueError(f"Cannot find VARIABLES in chan file: {chan_path}")
 
-        # 2)  ZONE 
+        # Locate ZONE.
         zone_line = None
         while True:
             line = f.readline()
@@ -822,7 +806,7 @@ def read_chan_channel_zones(chan_path):
         if zone_line is None:
             raise ValueError(f"Cannot find ZONE in chan file: {chan_path}")
 
-        # 3)  NODES/ELEMENTS/VARLOCATION
+        # Parse NODES, ELEMENTS, and VARLOCATION.
         mn = re.search(r"NODES=(\d+)", zone_line)
         me = re.search(r"ELEMENTS=(\d+)", zone_line)
         if not (mn and me):
@@ -831,19 +815,19 @@ def read_chan_channel_zones(chan_path):
         nn = int(mn.group(1))
         ne = int(me.group(1))
 
-        # VARLOCATION=([4,11,12,13]=CELLCENTERED) 
+        # Tecplot variable ids are 1-based.
         cellcentered_ids = set()
         mvl = re.search(r"VARLOCATION=\(\[([0-9,\s]+)\]=CELLCENTERED\)", zone_line)
         if mvl:
             ids = [int(x.strip()) for x in mvl.group(1).split(",") if x.strip()]
-            cellcentered_ids = set(ids)  # : Tecplot  1 
+            cellcentered_ids = set(ids)
 
-        # 4)  Zone (1-based)
+        # Locate the Zone variable.
         if "Zone" not in varnames:
             raise ValueError(f'CHAN VARIABLES does not include "Zone". Vars={varnames}')
         zone_vid = varnames.index("Zone") + 1  # 1-based
 
-        # 5) BLOCK: .  Zone 
+        # Read the Zone block.
         for vid, vname in enumerate(varnames, start=1):
             nread = ne if vid in cellcentered_ids else nn
             if vid < zone_vid:
@@ -968,7 +952,6 @@ def read_chan_element_centroids(chan_path):
         conn = _read_connectivity(f, ne)
 
     # ---- 6) Find x/y variable names ----
-    # Your CHAN screenshot shows "# x", so variable name should be "x".
     x_key = None
     y_key = None
 
@@ -1120,7 +1103,7 @@ def get_flow_rate_node(time):
     try:
         return get_required(time, FIELD_KEYS["flow_rate_node"])
     except KeyError:
-        pass  # not found  fallback
+        pass
 
     # Fallback: compute from velocities
     vx = np.array(get_required(time, FIELD_KEYS["vx_cell"]), dtype=float)
@@ -1231,15 +1214,11 @@ def average_node_field_to_cells(node_field):
         cell_vals[i] = (node_field[n1] + node_field[n2] + node_field[n3]) / 3.0
     return cell_vals
 
-# ===================== PARA CAL =====================
-
-# K_USLE function restored
 def calculate_KUSLE(SC, cch):
     tau_c = (0.1 + 0.1779*SC + 0.0028*SC**2 - 2.34e-5*SC**3)*cch
     kd = 0.2 * (tau_c**-0.5) if tau_c > 0 else 0.0
     return kd
 
-#  All velocity in m/s, SI unit
 def flow_mag(cell_idx, time):
     vx = get_required(time, "x linear velocity (cell centred)")
     vy = get_required(time, "y linear velocity (cell centred)")
@@ -1305,19 +1284,15 @@ def cal_Qproxy_m3_day(time, areas_m2):
     Returns:
         Q_proxy_m3_day: numpy array, shape (N,), m3/day per cell. 
     """
-    # 1) velocity magnitude (cell centred)
     vx = np.asarray(get_required(time, "x linear velocity (cell centred)"), dtype=float)
     vy = np.asarray(get_required(time, "y linear velocity (cell centred)"), dtype=float)
     vmag = np.hypot(vx, vy)  # m/s
 
-    # 2) depth (m) - use your existing cal_depth (already correct in your pipeline)
     depth = np.asarray(cal_depth(time), dtype=float)  # m
 
-    # 3) length scale from cell area
     A = np.asarray(areas_m2, dtype=float)             # m2
     L = np.sqrt(np.maximum(A, 0.0))                   # m
 
-    # 4) discharge proxy (m3/s) then convert to m3/day
     Q_m3s = vmag * depth * L
     Q_m3s = np.where(np.isfinite(Q_m3s), Q_m3s, 0.0)
     Q_m3s = np.maximum(Q_m3s, 0.0)
@@ -1325,7 +1300,6 @@ def cal_Qproxy_m3_day(time, areas_m2):
     Q_m3_day = Q_m3s * DT_SEC
     return Q_m3_day
 def get_node_count():
-    #  mesh  node_x  node  cell  node 
     x_nodes = get_required(MESH_TIME, MESH_KEYS["node_x"], allow_mesh_fallback=False)
     return len(x_nodes)
 
@@ -1346,31 +1320,24 @@ def get_node_field_or_zeros(t_sec, field_key_name_or_list, *, allow_mesh_fallbac
       - allow_mesh_fallback: pass-through to get_required fallback behavior
 
     Returns:
-      - np.ndarray of floats (length = triangle/node count, depending on your OLF variables)
+      - np.ndarray of floats (length = triangle/node count, depending on OLF variables)
         If the variable cannot be found at t_sec (or mesh fallback), returns zeros array
         with the same length as a reference field at that time (best effort).
     """
     import numpy as np
 
-    # 1) normalize input -> candidate key(s) for get_required()
     if isinstance(field_key_name_or_list, (list, tuple)):
         candidates = list(field_key_name_or_list)
     else:
-        # string case
-        # if FIELD_KEYS has an entry, use it; otherwise treat as direct key
         candidates = FIELD_KEYS.get(field_key_name_or_list, field_key_name_or_list)
 
-    # 2) try to read actual data
     try:
         arr = np.asarray(get_required(t_sec, candidates, allow_mesh_fallback=allow_mesh_fallback), dtype=float)
         return arr
     except Exception:
-        # 3) if missing, return zeros with a sane length
-        #    We infer length from any available numeric field at this time.
         data_t = olf_data.get(t_sec, {})
         ref = None
 
-        # Try a few common references first
         for ref_key in (
             "depth_node", "depth", "Depth", "water_depth",
             "q_node", "Q", "discharge", "Precipitation", "precipitation"
@@ -1379,7 +1346,6 @@ def get_node_field_or_zeros(t_sec, field_key_name_or_list, *, allow_mesh_fallbac
                 ref = data_t[ref_key]
                 break
 
-        # If not found, just pick the first array-like in this timestep
         if ref is None and isinstance(data_t, dict) and data_t:
             for v in data_t.values():
                 try:
@@ -1391,8 +1357,6 @@ def get_node_field_or_zeros(t_sec, field_key_name_or_list, *, allow_mesh_fallbac
                     continue
 
         if ref is None:
-            # absolutely no way to infer size
-            # last resort: try mesh_time reference
             data_m = olf_data.get(MESH_TIME, {}) if "MESH_TIME" in globals() else {}
             for v in (data_m.values() if isinstance(data_m, dict) else []):
                 try:
@@ -1404,7 +1368,6 @@ def get_node_field_or_zeros(t_sec, field_key_name_or_list, *, allow_mesh_fallbac
                     continue
 
         if ref is None:
-            # still nothing: return empty
             return np.zeros((0,), dtype=float)
 
         ref = np.asarray(ref, dtype=float)
@@ -1414,7 +1377,6 @@ def get_rain_node(t_sec):
     try:
         return get_node_field_or_zeros(t_sec, FIELD_KEYS["Precipitation"])
     except Exception:
-        #  0
         return np.zeros(get_node_count(), dtype=float)
 
 
@@ -1475,8 +1437,6 @@ def build_dynamic_channel_mask_for_time(time):
 
     return channel_mask
 
-# --- Global C_USLE default (if not defined elsewhere) ---
-
 def calculate_CUSLE(Acrop, Afallow, C_USLE=None):
     if C_USLE is not None:
         return float(C_USLE)
@@ -1485,7 +1445,6 @@ def calculate_CUSLE(Acrop, Afallow, C_USLE=None):
 def calculate_CFRG(rock):
     return max(0.0, 1.0 - rock)
 
-# ---- NEW: slope & LS from "Z coordinate" ----
 def compute_cell_slope_and_LS(time):
     """
     Returns:
@@ -1501,13 +1460,11 @@ def compute_cell_slope_and_LS(time):
     slope_sin = [0.0]*ntri
     LS_list   = [1.14]*ntri  # fallback
 
-    # helper for safe math
     def _clip(v, lo, hi):
         return max(lo, min(hi, v))
 
     areas_ha = compute_triangle_areas()
     areas_m2 = [a*10000.0 for a in areas_ha]
-    # characteristic slope length  ~ sqrt(area)
     lam = [max(1e-3, math.sqrt(a)) for a in areas_m2]  # meters
 
     for i in range(ntri):
@@ -1538,15 +1495,12 @@ def compute_cell_slope_and_LS(time):
         s = math.sin(theta)                    # needed by SWAT S-factor
         slope_sin[i] = s
 
-        # --- SWAT-like LS ---
-        # m from slope:  = (sin/0.0896) / (3*sin^0.8 + 0.56); m = /(1+)
+        # SWAT-style slope-length factor.
         s_cl = _clip(s, 0.0, 0.9999)
         denom_beta = 3.0*(s_cl**0.8) + 0.56
         beta = (s_cl/0.0896)/denom_beta if denom_beta > 0 else 0.0
         m = beta/(1.0 + beta) if beta > 0 else 0.0
-        # length factor
         L_fac = (lam[i]/22.13)**m
-        # slope factor (percent slope vs sin SWAT  sin )
         if s_cl < math.sin(math.atan(0.09)):  # slope < 9%
             S_fac = 10.8*s_cl + 0.03
         else:
@@ -1638,33 +1592,20 @@ def parameters_cal(time):
     else:
         area_hru_m2 = [1.0]*len(qch)
     b_char = [max(1e-3, (A**0.5)) for A in area_hru_m2]
-    # q_peak from Rational (kept as you set below)
 
     Q_surf = [q * DT_SEC for q in Q_cell]  #  m^3/day
-    # ---- 1) i(mm/hr)from Specified Flux (m/s); if missing -> 0 ----
     flux_mps_node = get_node_field_or_zeros(time, FIELD_KEYS["Precipitation"])              # m/s (node), safe
     flux_mps_cell = average_node_field_to_cells(flux_mps_node.tolist())          # m/s (cell)
     i_mmhr = [f * 3600.0 * 1000.0 for f in flux_mps_cell]                        # mm/hr
-            # mm/hr
-        # ===== Record this timestep =====
 
-    # ---- 2) area A(km^2) area_ha ----
     if USE_GEOM_AREA:
         area_ha = compute_triangle_areas()                             # ha
     else:
         area_ha = [1.0]*len(i_mmhr)
     A_km2 = [a / 100.0 for a in area_ha]                               # km^2
-    """
-    # ---- 3) Rational - q_peak(m^3/s) ----
-    C_r = 0.6        # can be changed 
-    FACTOR = 0.278   # factor
-    q_peak = [prf * FACTOR * C_r * i * A for i, A in zip(i_mmhr, A_km2)]  # m^3/s
-    #print("q_peak range (m3/s):", (min(q_peak) if q_peak else None), (max(q_peak) if q_peak else None))
-    """
-    # ---- NEW: LS from DEM ----
+
     slope_sin, LS_list = compute_cell_slope_and_LS(time)
 
-    # ---- q_peak (m3/s), selectable non-rainfall method ----
     if QPEAK_METHOD == "manning":
         q_peak = calculate_qpeak_manning(
             Depth_cell,
@@ -1680,7 +1621,6 @@ def parameters_cal(time):
     else:
         raise ValueError(f"Unknown qpeak_method={QPEAK_METHOD!r}. Use 'manning' or 'flowrate'.")
 
-    # Example default factors; replace with your globals if needed
     K_loc = calculate_KUSLE(SC, cch)
     C_val  = calculate_CUSLE(Acrop, Afallow, C_USLE)
     CFRG   = calculate_CFRG(rock)
@@ -1691,11 +1631,11 @@ def parameters_cal(time):
     )
     sed_by_timesteps   = [se for se in sediment_yield_all]
     if time == solution_times[0]:
-        log(f"[DBG] i_mmhr min/max = {min(i_mmhr):.3e}, {max(i_mmhr):.3e}")
-        log(f"[DBG] qpeak_method = {QPEAK_METHOD}, manning_n={MANNING_N}, qpeak_manning_factor={QPEAK_MANNING_FACTOR}")
-        log(f"[DBG] q_peak m3/s min/max = {min(q_peak):.3e}, {max(q_peak):.3e}")
-        log(f"[DBG] Q_surf m3/day min/max = {min(Q_surf):.3e}, {max(Q_surf):.3e}")
-        log(f"[DBG] area_ha min/max = {min(area_ha):.3e}, {max(area_ha):.3e}")
+        log(f"[DIAG] i_mmhr min/max = {min(i_mmhr):.3e}, {max(i_mmhr):.3e}")
+        log(f"[DIAG] qpeak_method = {QPEAK_METHOD}, manning_n={MANNING_N}, qpeak_manning_factor={QPEAK_MANNING_FACTOR}")
+        log(f"[DIAG] q_peak m3/s min/max = {min(q_peak):.3e}, {max(q_peak):.3e}")
+        log(f"[DIAG] Q_surf m3/day min/max = {min(Q_surf):.3e}, {max(Q_surf):.3e}")
+        log(f"[DIAG] area_ha min/max = {min(area_ha):.3e}, {max(area_ha):.3e}")
 
     return Q_surf, qch, q_peak, sed_by_timesteps, sediment_yield_all
 
@@ -1710,33 +1650,7 @@ def specified_flux_node_to_cell(time, *, to_day=True, cm_unit=False):
         I_node = [i * scale for i in I_node]
     I_cell = average_node_field_to_cells(I_node)
     return I_cell
-"""
-def cal_SDR(time):
-    I_cell = specified_flux_node_to_cell(time, to_day=True, cm_unit=False)  
-    zone_flag = zoneN(time)                        
-    A = [1.0 if z == 1 else 0.0 for z in zone_flag]
-    Q, _, q_peak, _, _ = parameters_cal(time)   
-    C = 0.8
-    r_peak = [C * Ii * Ai for Ii, Ai in zip(I_cell, A)]
 
-    SDR_list = []
-    for qp, qs, R, rp in zip(q_peak, Q, I_cell, r_peak):
-        if rp <= 0 or R <= 0:
-            SDR_list.append(0.0)
-        else:
-            SDR_raw = ((qp / (rp)) / (0.782845 + 0.217155 * qs / (R ))) ** 0.56
-            SDR_cal = a * (SDR_raw ** b)
-            SDR = max(0.0, min(1.0, SDR_cal))
-            SDR_list.append(float(SDR))
-
-    Ntri = len(global_coords['x1'])
-    if len(SDR_list) != Ntri:
-        raise RuntimeError(
-            f"[SDR length mismatch] SDR={len(SDR_list)} vs Ntri={Ntri}. "
-            "PLEASE CHECK Specified Flux"
-        )
-    return SDR_list
-"""
 def cal_SDR(time):
     """
     Hybrid delivery coefficient:
@@ -2622,7 +2536,7 @@ def plot_exchange_map(time, out_png=None, dpi=300, mask_zero=True):
         dtype=float
     )
 
-    # --- figure: same style as your sediment plot ---
+    # Use the same figure style as the sediment map output.
     fig, ax = plt.subplots(figsize=(16, 20), dpi=dpi)
 
     patches = PolyCollection(
@@ -2684,10 +2598,9 @@ def write_pest_txt_from_station_csv(station_csv_path, out_dir):
     import numpy as np
     import os
 
-    #  station CSV
+    # Read station SSC values.
     df = pd.read_csv(station_csv_path)
 
-    # =====  =====
     ssc_col = "SSC_station_mgL"
 
     if ssc_col not in df.columns:
@@ -2696,7 +2609,6 @@ def write_pest_txt_from_station_csv(station_csv_path, out_dir):
             f"Available columns: {list(df.columns)}"
         )
 
-    # 
     s = df[ssc_col].astype(float).to_numpy()
     s = s[np.isfinite(s)]
 
@@ -2709,7 +2621,7 @@ def write_pest_txt_from_station_csv(station_csv_path, out_dir):
         ssc_peak = float(np.max(s))
         ssc_mean = float(np.mean(s))
 
-    # =====  PEST  =====
+    # Write PEST observation values.
     pest_txt = os.path.join(out_dir, "pest_values.txt")
 
     with open(pest_txt, "w", encoding="utf-8") as f:
@@ -2964,7 +2876,7 @@ def main():
     global _AREA_M2_CACHE
     global MASSBAL_IN_CUM, MASSBAL_OUT_CUM, MASSBAL_STORAGE_LAST
 
-    # ------------------ 0) read config and apply global params ------------------
+    # Read configuration and apply global parameters.
     cfg = load_params_file(os.environ.get("GWSWI_CONFIG_PATH", os.path.join(APP_DIR, "Model_Config.txt")))
     apply_params(cfg)
 
@@ -2986,13 +2898,13 @@ def main():
     else:
         log("[INFO] No CHAN file provided; fallback to OLF depth threshold.")
 
-    # reset caches / cumulative trackers
+    # Reset caches and cumulative trackers for this run.
     _AREA_M2_CACHE = None
     MASSBAL_IN_CUM = 0.0
     MASSBAL_OUT_CUM = 0.0
     MASSBAL_STORAGE_LAST = 0.0
 
-    # ------------------ 1) read OLF ------------------
+    # Read HGS OLF data.
     olf_data = read_olf_variables(olf_path)
     solution_times = sorted(olf_data.keys())
 
@@ -3034,9 +2946,9 @@ def main():
     log(f"[INFO] Parsed {len(solution_times)} solution times.")
 
     MESH_TIME = find_mesh_time()
-    log(f"[DEBUG] MESH_TIME = {MESH_TIME}")
+    log(f"[DIAG] MESH_TIME = {MESH_TIME}")
 
-    # ------------------ 2) prepare geometry ------------------
+    # Prepare geometry.
     prepare_global_coords()
     prepare_neighbors()
 
@@ -3049,7 +2961,7 @@ def main():
     areas_ha = np.where(np.isfinite(areas_ha) & (areas_ha > 0.0), areas_ha, 1.0)
     areas_m2 = areas_ha * 10000.0
 
-    # ------------------ 3) helpers ------------------
+    # Build masks and station geometry.
     def build_channel_mask():
         """
         Build and store three masks:
@@ -3063,7 +2975,7 @@ def main():
 
         global DEPTH_MASK, CHAN_MASK, CHANNEL_MASK
 
-        # ---------- 1. depth-based active-water mask ----------
+        # Depth-based active-water mask.
         md_node = np.asarray(
             get_required(MESH_TIME, FIELD_KEYS["depth_node"]),
             dtype=float
@@ -3082,7 +2994,7 @@ def main():
             f"(threshold={depth_threshold})"
         )
 
-        # ---------- 2. CHAN-based true channel mask ----------
+        # CHAN-based true channel mask.
         chan_mask = np.zeros_like(depth_mask, dtype=bool)
 
         if chan_path and os.path.exists(chan_path):
@@ -3103,7 +3015,7 @@ def main():
         else:
             log("[WARN] CHAN file not found. Using empty CHAN mask.")
 
-        # ---------- 3. fixed base sediment transport mask ----------
+        # Fixed base sediment-transport mask.
         channel_mask = chan_mask.copy()
 
         DEPTH_MASK = depth_mask
@@ -3135,15 +3047,14 @@ def main():
         return ids
 
     CHANNEL_MASK = build_channel_mask()
-        # ------------------ output mesh / channel mask figure ------------------
     station_xy = (
         float(require_param(cfg, "station_xy_x")),
         float(require_param(cfg, "station_xy_y")),
     )
     STATION_R = float(require_param(cfg, "station_r"))
 
-    log(f"[DBG] station_xy used = {station_xy}")
-    log(f"[DBG] station_r used  = {STATION_R}")
+    log(f"[DIAG] station_xy used = {station_xy}")
+    log(f"[DIAG] station_r used  = {STATION_R}")
 
     station_ids = build_station_window_utm(station_xy, centroids, CHANNEL_MASK, R=STATION_R)
     station_ids_arr = np.asarray(station_ids, dtype=int) if len(station_ids) > 0 else np.asarray([], dtype=int)
@@ -3156,7 +3067,7 @@ def main():
     log(f"[STA] station window size = {len(station_ids)} (R={STATION_R} m)")
     log(f"[STA] station area = {station_area_m2:.6e} m2")
 
-    # ------------------ 4) output directory ------------------
+    # Output directory.
     if bool(int(require_param(cfg, "timestamp_output_dir"))):
         run_label = time.strftime(str(require_param(cfg, "output_timestamp_format")))
         out_dir = os.path.join(out_dir_cfg, run_label)
@@ -3171,11 +3082,11 @@ def main():
     log(f"[INFO] pest_mode={pest_mode}, write_cell_ssc_outputs={WRITE_CELL_SSC_OUTPUTS}")
     log("[MAIN] Start combined hillslope+SDR + river routing loop.")
 
-    # ------------------ 5) initial river storage from global conc ------------------
+    # Initial river storage from background concentration.
     time0 = solution_times[0]
     sed_prev = build_initial_sed_from_conc(time0, conc0_global)
 
-    # ------------------ 6) containers ------------------
+    # Output containers.
     station_ts = []
     cell_output_records = []
     retained_series = {}
@@ -3183,16 +3094,15 @@ def main():
 
     if ENABLE_DAILY_LOOP:
         retained_series, delivered_series = simulate_daily_loop()
-    # IMPORTANT: use globals only, no local cfg.get here
     Q_MIN = Qmin_station_m3_day
     C_BG = conc0_global 
 
-    # ------------------ 7) main time loop ------------------
+    # Main time loop.
     massbal_cumulative_residual_t = 0.0
     for idx, t in enumerate(solution_times):
         log(f"[STEP] Processing time = {t} s (index {idx})")
 
-        #  hillslope production + SDR routing
+        # Hillslope production and SDR routing.
         Q_surf, _, q_peak, _, sediment_yield_all = parameters_cal(t)
         q_peak = np.asarray(q_peak, dtype=float)
         Q0 = np.asarray(sediment_yield_all, dtype=float)
@@ -3209,11 +3119,11 @@ def main():
                 retained_series[t] = retained.copy()
                 delivered_series[t] = delivered.copy()
 
-        # rain for optional diagnostics
+        # Rainfall diagnostics.
         rain = np.asarray(cal_Precipitation(t), dtype=float)
         rain = np.where(np.isfinite(rain), rain, 0.0)
 
-        #  channel discharge proxy
+        # Channel discharge.
         Qflow_raw_m3_s = np.asarray(cal_Qflow_raw_cell_m3_s(t), dtype=float)
         Qexchange_m3_s = np.asarray(cal_exchange_q_cell_m3_s(t), dtype=float)
         Qflow_m3_s = np.asarray(cal_Qflow_cell_m3_s(t), dtype=float)
@@ -3223,7 +3133,7 @@ def main():
         Qflow_raw_m3_s = np.maximum(Qflow_raw_m3_s, 0.0)
         Qflow_m3_s = np.maximum(Qflow_m3_s, 0.0)
 
-        #  river routing
+        # River routing.
         sed_prev, conc_i, conc_max, massbal = flow_in_river_with_inflow(
             total_time=t,
             sed_flowin_river=delivered,
@@ -3290,7 +3200,7 @@ def main():
                 f"station_cells={int(station_ids_arr.size)}"
             )
 
-        #  station aggregation using station window only
+        # Station aggregation using the station window only.
         if station_ids_arr.size > 0:
             sid = station_ids_arr
 
@@ -3335,7 +3245,7 @@ def main():
             # station SSC from river-routing concentration field
             weights = np.maximum(Qflow_m3_s[sid], 0.0)
 
-            # old qpeak diagnostic
+            # q_peak diagnostic.
             if q_peak.size > 0:
                 old_qpeak_station_m3_s = float(np.nanmax(q_peak[sid]))
             else:
@@ -3346,14 +3256,13 @@ def main():
             else:
                 old_qpeak_station_m_s = np.nan
 
-            # station SSC from river-routing concentration field
-            # use the max-flow cell within the station window, instead of averaging all cells
+            # Station SSC from the river-routing concentration field.
 
             conc_station = np.asarray(conc_i[sid], dtype=float)
             conc_max_station = np.asarray(conc_max[sid], dtype=float)
             weights = np.asarray(np.maximum(Qflow_m3_s[sid], 0.0), dtype=float)
 
-            # effective concentration, limited by transport capacity
+            # Effective concentration, limited by transport capacity.
             conc_eff_station = np.minimum(conc_station, conc_max_station)
 
             valid = (
@@ -3391,7 +3300,7 @@ def main():
                 + SSC_resus_component_mgL
                 + SSC_event_component_mgL
             )
-            # ===== DEBUG: diagnose station SSC components =====
+            # Station SSC component diagnostics.
             if np.any(valid):
                 raw_conc_qw_mgL = float(np.average(conc_station[valid], weights=weights[valid]) * 1e6)
                 eff_conc_qw_mgL = float(np.average(conc_eff_station[valid], weights=weights[valid]) * 1e6)
@@ -3411,11 +3320,11 @@ def main():
                 max_conc_max_mgL = np.nan
                 Q_weight_sum_m3_s = np.nan
             if np.any(valid):
-                # approximate diagnostic: sediment mass implied by effective concentration and flow volume
+                # Sediment mass implied by effective concentration and flow volume.
                 V_flow_valid_m3_day = weights[valid] * DT_SEC
                 V_flow_sum_m3_day = float(np.nansum(V_flow_valid_m3_day))
 
-                # concentration using only flow volume as denominator, diagnostic only
+                # Concentration using only flow volume as denominator.
                 if V_flow_sum_m3_day > 0:
                     SSC_from_L_over_Q_mgL = float((L_station_t_day * 1e9) / (V_flow_sum_m3_day * 1000.0))
                 else:
